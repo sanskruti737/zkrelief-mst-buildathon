@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-gradient-to-br from-navy-900 via-navy-800 to-navy-900 text-white min-h-screen;
+}
+
+.card {
+  @apply bg-navy-700/50 backdrop-blur-sm border border-blue-500/30 rounded-lg p-6 shadow-xl;
+}
+
+.btn-primary {
+  @apply bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-500 hover:to-teal-500 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-blue-500/50;
+}
+
+.btn-secondary {
+  @apply bg-navy-700 hover:bg-navy-600 text-white border border-blue-500/50 py-2 px-6 rounded-lg transition-all duration-200;
+}
