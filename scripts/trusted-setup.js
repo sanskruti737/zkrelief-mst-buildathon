@@ -29,7 +29,7 @@ function snarkjs(args) {
 
 function generateDevelopmentPtau() {
   console.log(
-    "Generating a reproducible development-only Powers of Tau (2^12 constraints)."
+    "Generating a development-only Powers of Tau (2^12 constraints)."
   );
   const ptau0 = path.join(circuitsDir, "pot12_0000.ptau");
   const ptau1 = path.join(circuitsDir, "pot12_0001.ptau");
@@ -65,7 +65,7 @@ try {
   console.log("Running Groth16 setup...");
   snarkjs(["groth16", "setup", r1csPath, ptauPath, zkey0Path]);
 
-  console.log("Applying deterministic development phase-2 contribution...");
+  console.log("Applying development phase-2 contribution...");
   snarkjs([
     "zkey",
     "contribute",
@@ -89,7 +89,8 @@ try {
   console.log("  vkey:      ", vkeyPath);
   console.log("  verifier:  ", verifierPath);
   console.log(
-    "NOTE: This is a development-only trusted setup. Production requires a multi-party ceremony and an audit."
+    "NOTE: This is a development-only trusted setup. Regenerating changes the zkey/verifier pair. "
+      + "Production requires a multi-party ceremony and an audit."
   );
 } catch (error) {
   console.error("Setup failed:", error.message);

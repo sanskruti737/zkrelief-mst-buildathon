@@ -14,7 +14,8 @@
     "circuits:prove": "node scripts/generate-proof.js",
     "demo:local": "npx hardhat run scripts/demo-local.js",
     "test": "npx hardhat test",
-    "setup:zk": "npm run circuits:compile && npm run circuits:setup && npm run contracts:compile"
+    "setup:zk": "npm run circuits:compile && npm run circuits:setup && npm run contracts:compile && npm run sync:frontend-zk",
+    "sync:frontend-zk": "node scripts/sync-frontend-assets.js"
   },
   "keywords": [
     "zk",

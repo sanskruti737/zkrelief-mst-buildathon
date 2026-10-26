@@ -1,3 +1,4 @@
+require("dotenv").config();
 const { ethers } = require("ethers");
 
 const RPC_URL = process.env.MST_RPC_URL || "https://testnetrpc.mstblockchain.com";

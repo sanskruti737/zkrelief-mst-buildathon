@@ -22,18 +22,22 @@ cd frontend && npm install && cd ..
 npm run setup:zk
 ```
 
-This performs a reproducible **development-only** trusted setup:
+This performs a **development-only** trusted setup:
 
-- Generates a local 2^12 Powers-of-Tau file with deterministic entropy
+- Generates a local 2^12 Powers-of-Tau file
 - Runs `snarkjs groth16 setup`
-- Applies a deterministic phase-2 contribution
+- Applies a development phase-2 contribution
 - Verifies the final zkey
 - Exports `circuits/build/verification_key.json`
 - Exports the real Solidity verifier to `contracts/Verifier.sol`
 - Compiles the contracts
+- Copies the browser WASM/zkey/vkey and `ZKRelief.json` artifact into
+  `frontend/public/zk/` so the frontend cannot use stale proof assets
 
-This is not a production ceremony. Production requires an MPC ceremony and an
-independent security audit.
+This is not a production ceremony. snarkjs mixes fresh randomness, so
+regenerating the setup changes the verification key and verifier; keep the
+committed zkey and `Verifier.sol` in sync. Production requires an MPC ceremony
+and an independent security audit.
 
 ## Tests
 

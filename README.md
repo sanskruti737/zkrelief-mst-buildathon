@@ -92,15 +92,18 @@ npm run setup:zk
 This runs, in order:
 
 1. `circom circuits/eligibility.circom --r1cs --wasm --sym`
-2. A **reproducible development-only** Powers-of-Tau + Groth16 setup
+2. A **development-only** Powers-of-Tau + Groth16 setup
    (`circuits/pot12_final.ptau`, `eligibility_final.zkey`)
 3. `snarkjs zkey verify`
 4. Export of `circuits/build/verification_key.json`
 5. Export of the real Solidity verifier to `contracts/Verifier.sol`
 6. Hardhat compilation
+7. Synchronization of the browser WASM, zkey, verification key, and contract artifact into `frontend/public/zk/`
 
-The setup uses deterministic development entropy. It is **not** a production
-trusted setup; production requires a multi-party ceremony and an audit.
+The setup is for local development only and is **not** a production trusted
+setup. snarkjs mixes fresh randomness during setup, so regenerating the keys
+changes the verification key and Solidity verifier. Commit the zkey and verifier
+together; production requires a multi-party ceremony and an audit.
 
 You can also run the steps individually:
 
