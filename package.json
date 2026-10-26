@@ -6,25 +6,38 @@
   "scripts": {
     "dev": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
+    "typecheck": "cd frontend && npx tsc --noEmit",
     "contracts:compile": "npx hardhat compile",
     "contracts:test": "npx hardhat test",
     "circuits:compile": "node scripts/compile-circuit.js",
     "circuits:setup": "node scripts/trusted-setup.js",
     "circuits:prove": "node scripts/generate-proof.js",
-    "demo:local": "node scripts/demo-local.js"
+    "demo:local": "npx hardhat run scripts/demo-local.js",
+    "test": "npx hardhat test",
+    "setup:zk": "npm run circuits:compile && npm run circuits:setup && npm run contracts:compile"
   },
-  "keywords": ["zk", "circom", "snarkjs", "groth16", "relief", "aid", "privacy"],
+  "keywords": [
+    "zk",
+    "circom",
+    "snarkjs",
+    "groth16",
+    "relief",
+    "aid",
+    "privacy"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "hardhat": "^2.19.4"
+    "hardhat": "^2.19.4",
+    "typescript": "^5.4.5"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.1",
     "circomlib": "^2.0.5",
     "circomlibjs": "^0.1.7",
     "ethers": "^6.9.2",
-    "snarkjs": "^0.7.3"
+    "snarkjs": "^0.7.3",
+    "dotenv": "^16.4.5"
   }
 }

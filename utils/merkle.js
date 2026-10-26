@@ -1,10 +1,18 @@
 const { buildPoseidon } = require("circomlibjs");
 
+const ZERO = 0n;
+
 class MerkleTree {
   constructor(leaves, levels = 3) {
+    if (leaves.length > 2 ** levels) {
+      throw new Error(`Too many leaves (${leaves.length}) for ${levels} levels`);
+    }
     this.levels = levels;
-    this.leaves = leaves;
+    this.capacity = 2 ** levels;
+    this.leaves = leaves.map((leaf) => BigInt(leaf));
     this.poseidon = null;
+    this.F = null;
+    this.tree = null;
   }
 
   async init() {
@@ -14,37 +22,23 @@ class MerkleTree {
     return this;
   }
 
-  hash(left, right) {
-    const h = this.poseidon([BigInt(left), BigInt(right)]);
-    return this.F.toString(h);
+  _hash(left, right) {
+    return this.F.toString(this.poseidon([BigInt(left), BigInt(right)]));
   }
 
   buildTree() {
-    let nodes = this.leaves.map(l => this.F.toString(this.poseidon([BigInt(l)])));
+    const tree = Array.from({ length: this.levels + 1 }, () => []);
+    tree[0] = Array.from({ length: this.capacity }, (_, i) =>
+      i < this.leaves.length ? this.leaves[i] : ZERO
+    );
+
     for (let level = 0; level < this.levels; level++) {
-      let levelSize = Math.ceil(nodes.length / 2);
-      let nextLevel = [];
-      for (let i = 0; i < levelSize; i++) {
-        const left = nodes[2 * i] || "0";
-        const right = nodes[2 * i + 1] || "0";
-        const h = this.poseidon([BigInt(left), BigInt(right)]);
-        nextLevel.push(this.F.toString(h));
-      }
-      nodes = nextLevel;
-      if (level === this.levels - 1) break;
-    }
-    // Build full tree
-    let tree = Array(this.levels + 1).fill().map(() => []);
-    tree[0] = this.leaves.map(l => this.F.toString(this.poseidon([BigInt(l)])));
-    for (let level = 0; level < this.levels; level++) {
-      for (let i = 0; i < Math.pow(2, this.levels - level); i += 2) {
-        const left = tree[level][i] || "0";
-        const right = tree[level][i + 1] || "0";
-        if (!tree[level + 1]) tree[level + 1] = [];
-        const h = this.poseidon([BigInt(left), BigInt(right)]);
-        tree[level + 1][Math.floor(i / 2)] = this.F.toString(h);
+      const width = 2 ** (this.levels - level);
+      for (let i = 0; i < width; i += 2) {
+        tree[level + 1][i / 2] = this._hash(tree[level][i], tree[level][i + 1]);
       }
     }
+
     return tree;
   }
 
@@ -53,17 +47,33 @@ class MerkleTree {
   }
 
   getProof(leafIndex) {
-    let pathElements = [];
-    let pathIndices = [];
+    if (leafIndex < 0 || leafIndex >= this.capacity) {
+      throw new Error(`Leaf index out of range: ${leafIndex}`);
+    }
+    const pathElements = [];
+    const pathIndices = [];
     let index = leafIndex;
+
     for (let level = 0; level < this.levels; level++) {
       const siblingIndex = index % 2 === 0 ? index + 1 : index - 1;
-      pathElements.push(this.tree[level][siblingIndex] || "0");
-      pathIndices.push(index % 2);
+      pathElements.push(String(this.tree[level][siblingIndex]));
+      pathIndices.push(String(index % 2));
       index = Math.floor(index / 2);
     }
+
     return { pathElements, pathIndices };
   }
 }
 
-module.exports = { MerkleTree };
+async function buildTreeFromSecrets(secrets, levels = 3) {
+  const poseidon = await buildPoseidon();
+  const F = poseidon.F;
+  const commitments = secrets.map((secret) =>
+    F.toString(poseidon([BigInt(secret)]))
+  );
+  const tree = new MerkleTree(commitments, levels);
+  await tree.init();
+  return { tree, commitments };
+}
+
+module.exports = { MerkleTree, buildTreeFromSecrets };

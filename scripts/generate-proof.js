@@ -1,26 +1,73 @@
-const snarkjs = require('snarkjs');
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
+const {
+  BUILD_DIR,
+  createDemoCampaign,
+  generateProof,
+  verifyProof,
+  toSolidityCalldata,
+} = require("./lib/zk");
 
-async function generateProof(input) {
-  const buildDir = path.join(__dirname, '..', 'circuits', 'build');
-  const wasmPath = path.join(buildDir, 'eligibility_js', 'eligibility.wasm');
-  const zkeyPath = path.join(buildDir, 'eligibility_final.zkey');
-  
-  const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasmPath, zkeyPath);
-  return { proof, publicSignals };
+function stringify(value) {
+  return JSON.stringify(value, (_key, v) => (typeof v === "bigint" ? v.toString() : v), 2);
 }
 
-async function verifyProof(proof, publicSignals) {
-  const buildDir = path.join(__dirname, '..', 'circuits', 'build');
-  const vkeyPath = path.join(buildDir, 'verification_key.json');
-  const vKey = JSON.parse(fs.readFileSync(vkeyPath));
-  const res = await snarkjs.groth16.verify(vKey, publicSignals, proof);
-  return res;
+function parseArgs(argv) {
+  const args = { campaignId: 1, index: 0, outDir: path.join(BUILD_DIR, "demo") };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--campaign-id") args.campaignId = Number(argv[++i]);
+    else if (arg === "--index") args.index = Number(argv[++i]);
+    else if (arg === "--out") args.outDir = path.resolve(argv[++i]);
+  }
+  return args;
+}
+
+async function main() {
+  const { campaignId, index, outDir } = parseArgs(process.argv.slice(2));
+  const campaign = await createDemoCampaign({ campaignId });
+  const credential = campaign.credentials[index];
+
+  if (!credential) {
+    throw new Error(`No demo credential at index ${index}`);
+  }
+
+  console.log(`Generating Groth16 proof for synthetic credential #${credential.id}...`);
+  const result = await generateProof(credential, campaignId);
+
+  const valid = await verifyProof(result.proof, result.publicSignals);
+  if (!valid) {
+    throw new Error("Off-chain proof verification failed");
+  }
+
+  const { a, b, c, input } = toSolidityCalldata(result.proof, result.publicSignals);
+
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(path.join(outDir, "credential.json"), JSON.stringify(credential, null, 2));
+  fs.writeFileSync(path.join(outDir, "proof.json"), stringify(result.proof));
+  fs.writeFileSync(
+    path.join(outDir, "public.json"),
+    stringify(result.publicSignals)
+  );
+  fs.writeFileSync(
+    path.join(outDir, "calldata.json"),
+    stringify({ a, b, c, input })
+  );
+
+  console.log("Proof generated and verified off-chain.");
+  console.log("Public signals:", result.publicSignals);
+  console.log("Expected order: [root, nullifier, campaignId]");
+  console.log("Nullifier:", result.nullifier);
+  console.log("Artifacts written to:", outDir);
 }
 
 module.exports = { generateProof, verifyProof };
 
 if (require.main === module) {
-  console.log('Proof generation utilities ready');
+  main()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
 }

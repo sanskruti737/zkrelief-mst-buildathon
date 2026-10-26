@@ -3,7 +3,26 @@ pragma solidity ^0.8.20;
 
 import "./Verifier.sol";
 
-contract ZKRelief is Groth16Verifier {
+interface IGroth16Verifier {
+    function verifyProof(
+        uint256[2] calldata a,
+        uint256[2][2] calldata b,
+        uint256[2] calldata c,
+        uint256[3] calldata input
+    ) external view returns (bool);
+}
+
+contract ZKRelief {
+    IGroth16Verifier public immutable verifier;
+
+    constructor() {
+        // Deploy the actual snarkjs-generated Groth16 verifier as a separate
+        // contract. The external call is intentional: it prevents the Solidity
+        // optimizer from inlining the verifier assembly (whose Yul `return`
+        // would otherwise return from submitClaim itself).
+        verifier = IGroth16Verifier(address(new Groth16Verifier()));
+    }
+
     struct Campaign {
         string name;
         string description;
@@ -54,10 +73,10 @@ contract ZKRelief is Groth16Verifier {
     
     function submitClaim(
         uint256 campaignId,
-        uint256[2] memory a,
-        uint256[2][2] memory b,
-        uint256[2] memory c,
-        uint256[3] memory input // [root, nullifier, campaignId]
+        uint256[2] calldata a,
+        uint256[2][2] calldata b,
+        uint256[2] calldata c,
+        uint256[3] calldata input // [root, nullifier, campaignId]
     ) external {
         Campaign storage campaign = campaigns[campaignId];
         require(campaign.campaignId == campaignId, "Campaign does not exist");
@@ -70,7 +89,7 @@ contract ZKRelief is Groth16Verifier {
         require(input[2] == campaignId, "Invalid campaign ID");
         
         // Verify proof
-        require(verifyProof(a, b, c, input), "Invalid proof");
+        require(verifier.verifyProof(a, b, c, input), "Invalid proof");
         
         // Mark nullifier as used and update counts
         nullifierUsed[campaignId][nullifier] = true;

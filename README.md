@@ -61,14 +61,15 @@ zkrelief/
 ## Setup and Installation
 
 ### Prerequisites
-- Node.js v18+ and npm
-- Circom compiler (https://docs.circom.io/getting-started/installation/)
-- snarkjs (installed via npm)
+
+- Node.js v18+ and npm (tested with Node 24)
+- Circom **2.1.6** (the real Rust compiler, not the legacy npm 0.5.x package)
+  - Set `CIRCOM_BIN=/path/to/circom` if it is not on `PATH`.
+- snarkjs is installed locally via npm
 
 ### Installation
 
 ```bash
-# Install dependencies
 npm install
 cd frontend && npm install && cd ..
 ```
@@ -82,60 +83,125 @@ cp .env.example .env
 
 ## Development Workflow
 
-### 1. Compile Circom Circuit
+### 1. Build all ZK artifacts and contracts
+
+```bash
+npm run setup:zk
+```
+
+This runs, in order:
+
+1. `circom circuits/eligibility.circom --r1cs --wasm --sym`
+2. A **reproducible development-only** Powers-of-Tau + Groth16 setup
+   (`circuits/pot12_final.ptau`, `eligibility_final.zkey`)
+3. `snarkjs zkey verify`
+4. Export of `circuits/build/verification_key.json`
+5. Export of the real Solidity verifier to `contracts/Verifier.sol`
+6. Hardhat compilation
+
+The setup uses deterministic development entropy. It is **not** a production
+trusted setup; production requires a multi-party ceremony and an audit.
+
+You can also run the steps individually:
+
 ```bash
 npm run circuits:compile
-```
-
-### 2. Trusted Setup and Generate Verifier
-```bash
 npm run circuits:setup
-```
-**Note**: This uses a development-only trusted setup. Production deployments require proper MPC ceremony and security audit.
-
-### 3. Compile Smart Contracts
-```bash
 npm run contracts:compile
 ```
 
-### 4. Run Tests
+### 2. Run tests
+
 ```bash
-npm run contracts:test
-npx hardhat test
+npm test
 ```
 
-### 5. Run Local Demo
+The suite generates real Groth16 proofs with synthetic credentials and checks:
+
+- valid proofs are accepted on-chain
+- tampered proofs are rejected
+- duplicate campaign nullifiers are rejected
+- nullifiers are campaign-scoped
+- wrong Merkle roots / campaign IDs / inactive campaigns are rejected
+
+### 3. Run the local demo
+
+Against Hardhat's in-process network:
+
 ```bash
-# Terminal 1: Start local Hardhat node
+npm run demo:local
+```
+
+Against a real local JSON-RPC node:
+
+```bash
+# Terminal 1
 npx hardhat node
 
-# Terminal 2: Deploy contracts
+# Terminal 2
 npx hardhat run scripts/deploy.js --network localhost
-
-# Terminal 3: Run frontend
-cd frontend && npm run dev
+npx hardhat run scripts/demo-local.js --network localhost
 ```
 
-## Reproducing the Demo
+The demo deploys ZKRelief + the generated verifier, creates a campaign,
+generates a real proof for a synthetic beneficiary, submits a valid claim,
+prints updated totals, and confirms the duplicate claim is rejected.
 
-1. Start local blockchain and deploy contracts
-2. Use Organizer dashboard to create a campaign and generate 8 demo credentials
-3. Download one credential JSON
-4. Use Beneficiary dashboard to upload credential, generate ZK proof, submit claim
-5. Verify public totals increase in Audit dashboard
-6. Attempt to submit same claim again - should be rejected as duplicate nullifier
+### 4. Frontend
+
+```bash
+cd frontend
+npm run dev
+npm run build
+```
+
+For a local deployment set:
+
+```env
+VITE_CONTRACT_ADDRESS=<deployed-address>
+VITE_CHAIN_ID=31337
+VITE_RPC_URL=http://127.0.0.1:8545
+```
+
+The frontend generates Groth16 proofs in the browser from
+`frontend/public/zk/eligibility.wasm` and `eligibility_final.zkey`.
+
+A browser diagnostic page is available at `/zk-selftest.html`. With a local
+Hardhat node running (the Vite dev server proxies `/rpc` to port 8545), open
+`/zk-selftest.html?e2e=1` to deploy a contract, create a campaign, generate a
+browser proof, submit a claim, and confirm the duplicate is rejected.
 
 ## MST Blockchain Configuration
 
-Configure MST testnet in `.env`:
-```env
-MST_RPC_URL=<verified-rpc-url>
-MST_CHAIN_ID=<verified-chain-id>
-MST_EXPLORER_URL=<verified-explorer-url>
-DEPLOYER_PRIVATE_KEY=<your-deployer-key>  # Never put in frontend
+Configuration verified against the official MST documentation:
+https://docs.mstblockchain.com/developer-docs/foundation/development-networks-mst-testnet.md
+
+| Setting | Value |
+| --- | --- |
+| Network | MST Testnet |
+| Chain ID | `91562037` |
+| RPC URL | `https://testnetrpc.mstblockchain.com` |
+| Explorer | `https://testnet.mstscan.com` |
+| Faucet | `https://faucet.mstblockchain.com` |
+| Currency | `tMSTC` |
+
+Check live connectivity:
+
+```bash
+node scripts/check-mst.js
 ```
 
-**Important**: Always verify RPC URL, chain ID, and explorer from official MST Blockchain documentation. Deploy to MST testnet only when properly configured and funded.
+Deployment requires a funded deployer key:
+
+```bash
+# Never commit this key
+export DEPLOYER_PRIVATE_KEY=0x...
+npx hardhat run scripts/deploy.js --network mstTestnet
+```
+
+The deploy script refuses to proceed when the deployer has no native balance.
+MST deployment was not performed in this repository because no funded deployer
+key was available. The local implementation and proof-verification suite pass.
 
 ## Privacy Limitations
 
